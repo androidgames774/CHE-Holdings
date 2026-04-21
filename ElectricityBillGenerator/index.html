@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tenant Electricity Bill Generator</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Tenant Electricity Bill Generator</h1>
+      <p>Enter readings, allocate fixed charges proportionally, and print each bill as PDF.</p>
+    </div>
+    <div class="header-actions no-print">
+      <button id="loadSampleBtn" type="button">Load sample data</button>
+      <button id="saveBtn" type="button">Save in browser</button>
+      <button id="exportCsvBtn" type="button">Export CSV</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel no-print">
+      <h2>Settings</h2>
+      <div class="grid two-col">
+        <label>
+          <span>Property / Building</span>
+          <input id="propertyName" type="text" />
+        </label>
+        <label>
+          <span>Commercial Unit Price (Rs/kWh)</span>
+          <input id="unitPrice" type="number" min="0" step="0.01" />
+        </label>
+        <label>
+          <span>Total Fixed Charge (Rs.)</span>
+          <input id="fixedCharge" type="number" min="0" step="0.01" />
+        </label>
+        <label>
+          <span>Total SSC Levy (Rs.)</span>
+          <input id="sscRate" type="number" min="0" step="0.01" />
+        </label>
+        <label>
+          <span>Payment Due Days</span>
+          <input id="dueDays" type="number" min="0" step="1" />
+        </label>
+      </div>
+      <label class="mt-12">
+        <span>Bill Notes</span>
+        <textarea id="billNotes" rows="3"></textarea>
+      </label>
+      <p class="help">Formula: Energy Charge = Units × Unit Price. Fixed Share = Fixed Charge × (Tenant Units / Total Building Units). SSC Levy Share = Total SSC Levy × (Tenant Units / Total Building Units).</p>
+    </section>
+
+    <section class="panel no-print">
+      <div class="panel-title-row">
+        <h2>Tenant Readings</h2>
+        <button id="addRowBtn" type="button">Add tenant row</button>
+      </div>
+      <div class="table-wrap">
+        <table id="readingsTable">
+          <thead>
+            <tr>
+              <th>Tenant ID</th>
+              <th>Tenant Name</th>
+              <th>Unit</th>
+              <th>Meter No.</th>
+              <th>Start Date</th>
+              <th>Start Reading</th>
+              <th>End Date</th>
+              <th>End Reading</th>
+              <th>Units</th>
+              <th>Energy Charge</th>
+              <th>Fixed Share</th>
+              <th>SSC Levy</th>
+              <th>Total Due</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="summary-cards">
+        <div class="summary-card">
+          <span>Total Building Units</span>
+          <strong id="totalUnits">0</strong>
+        </div>
+        <div class="summary-card">
+          <span>Total Energy Charges</span>
+          <strong id="totalEnergy">Rs. 0.00</strong>
+        </div>
+        <div class="summary-card">
+          <span>Total Fixed Charges Allocated</span>
+          <strong id="totalFixed">Rs. 0.00</strong>
+        </div>
+        <div class="summary-card">
+          <span>Total SSC Levy</span>
+          <strong id="totalSsc">Rs. 0.00</strong>
+        </div>
+        <div class="summary-card">
+          <span>Total Amount Billed</span>
+          <strong id="totalBilled">Rs. 0.00</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel no-print">
+      <div class="panel-title-row">
+        <h2>Bill Preview</h2>
+        <div class="inline-actions">
+          <label>
+            <span>Select Tenant</span>
+            <select id="tenantPicker"></select>
+          </label>
+          <button id="printBtn" type="button">Print / Save PDF</button>
+        </div>
+      </div>
+      <p class="help">Tip: open the bill preview, click Print / Save PDF, then choose “Save as PDF” in your browser.</p>
+    </section>
+
+    <section id="billSheet" class="bill-sheet">
+      <div class="bill-top">
+        <div>
+          <div class="eyebrow">Electricity Bill</div>
+          <h2 id="billProperty">-</h2>
+          <p id="billTenantLine">-</p>
+        </div>
+        <div class="issue-box">
+          <div><span>Issue Date</span><strong id="billIssueDate">-</strong></div>
+          <div><span>Due Date</span><strong id="billDueDate">-</strong></div>
+        </div>
+      </div>
+
+      <div class="mini-grid">
+        <div class="mini-card">
+          <span>Start Date</span>
+          <strong id="billStartDate">-</strong>
+        </div>
+        <div class="mini-card">
+          <span>End Date</span>
+          <strong id="billEndDate">-</strong>
+        </div>
+        <div class="mini-card">
+          <span>Meter No.</span>
+          <strong id="billMeterNo">-</strong>
+        </div>
+      </div>
+
+      <div class="charge-banner">
+        <div class="chip">
+          <span>Current Reading</span>
+          <strong id="billEndReading">0</strong>
+        </div>
+        <div class="operator">-</div>
+        <div class="chip">
+          <span>Previous Reading</span>
+          <strong id="billStartReading">0</strong>
+        </div>        
+        <div class="operator">=</div>
+        <div class="chip emphasis">
+          <span>Consumed Units</span>
+          <strong id="billUnits">0</strong>
+        </div>
+      </div>
+
+      <div class="bill-grid">
+        <div class="bill-panel">
+          <h3>Charge Breakdown</h3>
+          <table class="charge-table">
+            <tbody>
+              <tr><td>Unit Price</td><td id="billUnitPrice">Rs. 0.00</td></tr>
+              <tr><td>Energy Charge</td><td id="billEnergy">Rs. 0.00</td></tr>
+              <tr><td>Tenant Fixed Share</td><td id="billFixedShare">Rs. 0.00</td></tr>
+              <tr><td>SSC Levy</td><td id="billSsc">Rs. 0.00</td></tr>
+              <tr class="total-row"><td>Total Due</td><td id="billTotal">Rs. 0.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="bill-panel">
+          <h3>Calculation</h3>
+          <div class="formula-box">
+            <p id="formulaEnergy">Energy = Units × Price</p>
+            <p id="formulaFixed">Fixed = Total Fixed Charge × (Tenant Units / Total Units)</p>
+            <p id="formulaSsc">SSC Levy Share = Total SSC Levy × (Tenant Units / Total Units)</p>
+          </div>
+          <div class="notes-box">
+            <h4>Notes</h4>
+            <p id="billNotesPreview">-</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <template id="rowTemplate">
+    <tr>
+      <td><input data-field="tenantId" type="text" /></td>
+      <td><input data-field="tenantName" type="text" /></td>
+      <td><input data-field="unit" type="text" /></td>
+      <td><input data-field="meterNo" type="text" /></td>
+      <td><input data-field="startDate" type="date" /></td>
+      <td><input data-field="startReading" type="number" min="0" step="1" /></td>
+      <td><input data-field="endDate" type="date" /></td>
+      <td><input data-field="endReading" type="number" min="0" step="1" /></td>
+      <td class="calc" data-field="units">0</td>
+      <td class="calc" data-field="energyCharge">Rs. 0.00</td>
+      <td class="calc" data-field="fixedShare">Rs. 0.00</td>
+      <td class="calc" data-field="sscLevy">Rs. 0.00</td>
+      <td class="calc" data-field="totalDue">Rs. 0.00</td>
+      <td><button class="danger" data-action="delete" type="button">Delete</button></td>
+    </tr>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
